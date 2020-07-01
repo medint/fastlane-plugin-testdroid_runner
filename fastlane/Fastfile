@@ -1,0 +1,170 @@
+#######################################
+#              Android                #
+#######################################
+
+desc 'Runs UI tests'
+lane :uitest do
+  begin
+    # Define your own project
+    project = ''
+    # Create a gradle script that converts the tags into a buildconfig property
+    if ENV['TEST_TAGS'].nil?
+      puts 'Warning: No Test Tags defined'.yellow
+    end
+
+    puts("Using project and device group '#{project}'".blue)
+    app_apk = File.expand_path(File.join(File.dirname(__FILE__), '..',
+                                          "#{git_branch}-app-#{last_git_commit[:abbreviated_commit_hash]}.apk"))
+    test_apk = File.expand_path(File.join(File.dirname(__FILE__), '..',
+                                          "#{git_branch}-test-#{last_git_commit[:abbreviated_commit_hash]}.apk"))
+    # If we don't build debug, the test app won't be able to start on BitBar
+    original_app_apk = gradle_build(flavor: 'Dev', build_type: 'Debug')
+    original_test_apk = gradle_build(flavor: 'Dev', build_type: 'Debug', app_type: 'AndroidTest')
+    FileUtils.cp(original_app_apk, app_apk)
+    FileUtils.cp(original_test_apk, test_apk)
+    testdroid_runner(application_file: app_apk, test_file: test_apk,
+                      project: project, device_group: project)
+  rescue StandardError
+    # Handle the Error
+    raise
+  ensure
+    FileUtils.rm(app_apk, force: true)
+    FileUtils.rm(test_apk, force: true)
+  end
+end
+
+desc 'Publish a build to BitBar'
+lane :uploadToTestdroid do
+  begin
+    upload_file = gradle_build()
+    upload_file = File.expand_path(File.join(File.dirname(__FILE__), "..", "#{git_branch}.apk"))
+    FileUtils.cp(lane_context[SharedValues::GRADLE_APK_OUTPUT_PATH].to_s, upload_file)
+    upload_testdroid(application_file: upload_file)
+  ensure
+    FileUtils.rm(upload_file, force: true)
+  end
+end
+
+# Build Android
+def gradle_build(params = {})
+  build_type = params[:build_type] || ENV['BUILD_TYPE']
+  app_type = (params[:app_type]).to_s
+  flavor = (params[:flavor]).to_s
+  # Unless we clean the build folder, we won't be really able to know which APK was built using the gradle plugin
+  # Therefore SharedValues::GRADLE_APK_OUTPUT_PATH is useless for us
+  # See https://github.com/fastlane/fastlane/issues/13162
+  # taken from https://github.com/fastlane/fastlane/blob/76e0b270ca1e0e4a262d8d0186917c709631513d/fastlane/lib/fastlane/actions/gradle.rb#L63-L72
+  apk_search_path = File.join('..', 'app', 'build', 'outputs', 'apk', app_type, flavor, build_type, '*.apk')
+  gradle(task: "assemble#{flavor}#{build_type}#{app_type}")
+  new_apks = Dir[apk_search_path].reject { |path| path =~ /^.*-unaligned.apk$/i }
+  new_apks = new_apks.map { |path| File.expand_path(path) }
+  new_apks.max_by(&File.method(:mtime))
+end
+
+#######################################
+#                iOS                  #
+#######################################
+desc 'Run UI Tests'
+lane :uitest do
+  begin
+    # Define your app name
+    app_name = ''
+    # Define your app name
+    app_identifier = ''
+    # Define your configuration
+    configuration = 'Release'
+    # Define your own project
+    project = ''
+
+    puts "Using project and device group '#{project}'".blue
+
+    # BitBar doesn't allow us to select the test plan yet, so we use tags
+    if ENV['TEST_TAGS'].nil?
+      puts 'Warning: No Test Tags defined'.yellow
+    else
+      set_info_plist_value(path: "#{app_name}UITests/Info.plist", key: 'Tags', value: ENV['TEST_TAGS'])
+    end
+
+    match(type: 'adhoc',
+          app_identifier: app_identifier)
+
+    scan(
+      scheme: app_name,
+      configuration: configuration,
+      clean: true,
+      build_for_testing: true,
+      code_coverage: true,
+      destination: 'generic/platform=iOS',
+      sdk: 'iphoneos'
+    )
+    build_dir = File.expand_path(File.join(lane_context[SharedValues::SCAN_DERIVED_DATA_PATH],
+                                            'Build', 'Products', "#{configuration}-iphoneos"))
+    target_app = File.expand_path(File.join(File.dirname(__FILE__), '..',
+                                            "#{git_branch}-app-#{last_git_commit[:abbreviated_commit_hash]}"))
+    target_app_zip = "#{target_app}.zip"
+    target_app = "#{target_app}.ipa"
+    target_test = File.expand_path(File.join(File.dirname(__FILE__), '..',
+                                              "#{git_branch}-test-#{last_git_commit[:abbreviated_commit_hash]}.zip"))
+    # BitBar needs the app to be located inside a "Payload" directory
+    tmp_dir = Dir.mktmpdir
+    app_dir = File.join(tmp_dir, 'Payload')
+    Dir.mkdir(app_dir)
+    FileUtils.cp_r(File.join(build_dir, "#{app_name}.app"), app_dir)
+    # Remove files so that zip doesn't append them
+    File.unlink(target_app_zip) if File.exist?(target_app_zip)
+    File.unlink(target_test) if File.exist?(target_test)
+    zip(
+      path: app_dir,
+      output_path: target_app_zip,
+      verbose: false,
+      symlinks: true
+    )
+    File.rename(target_app_zip, target_app)
+    FileUtils.rm_rf(tmp_dir)
+    zip(
+      path: File.join(build_dir, "#{app_name}UITests-Runner.app"),
+      output_path: target_test,
+      verbose: false,
+      symlinks: true
+    )
+    testdroid_runner(application_file: target_app, test_file: target_test,
+                      project: project, device_group: project)
+  rescue StandardError
+    # Handle the Error
+    raise
+  ensure
+    FileUtils.rm(target_app, force: true)
+    FileUtils.rm(target_test, force: true)
+  end
+end
+
+desc 'Publish a build to BitBar'
+lane :uploadToTestdroid do
+  begin
+    # Define your app name
+    app_name = ''
+    # Define your app name
+    app_identifier = ''
+    # Define your configuration
+    configuration = 'Release'
+
+    upload_dir = File.expand_path(File.join(File.dirname(__FILE__), '..', 'build'))
+    upload_file = File.join(upload_dir, "#{git_branch}.ipa")
+    Dir.mkdir(upload_dir)
+
+    match(type: 'adhoc',
+          app_identifier: app_identifier)
+
+    build_ios_app(
+      configuration: configuration,
+      scheme: app_name,
+      clean: false,
+      output_directory: upload_dir,
+      output_name: File.basename(upload_file),
+      include_symbols: true
+    )
+    upload_testdroid(application_file: upload_file)
+  ensure
+    FileUtils.rm_rf(upload_dir)
+  end
+end
