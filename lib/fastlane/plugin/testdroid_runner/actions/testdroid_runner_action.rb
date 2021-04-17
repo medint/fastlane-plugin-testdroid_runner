@@ -75,7 +75,12 @@ module Fastlane
                                   description: "Which type of scheduler to use, by default it will only run one device at a time",
                                   optional: true,
                                   type: String,
-                                  default_value: "SERIAL")
+                                  default_value: "SERIAL"),
+          FastlaneCore::ConfigItem.new(key: :access_group,
+                                  env_name: "TESTDROID_RUNNER_ACCESS_GROUP",
+                                  description: "If present, will share uploaded files with the named access group",
+                                  optional: true,
+                                  type: String)
         ]
       end
 

@@ -24,10 +24,10 @@ module Fastlane
 
         # Upload file
         puts("[testdroid] Uploading app #{os_config[:extname]}...")
-        file_app = Helper::TestdroidRunnerHelper.upload_file(params[:application_file])
+        file_app = Helper::TestdroidRunnerHelper.upload_file(params[:application_file], params[:access_group])
         # instrumentation package
         puts("[testdroid] Uploading test #{os_config[:extname]}...")
-        file_test = Helper::TestdroidRunnerHelper.upload_file(params[:test_file])
+        file_test = Helper::TestdroidRunnerHelper.upload_file(params[:test_file], params[:access_group])
 
         i = 0
         until id_list[i, i + params[:concurrency] * 2].nil?

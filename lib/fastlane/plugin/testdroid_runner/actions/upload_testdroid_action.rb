@@ -38,6 +38,11 @@ module Fastlane
                                   env_name: "TESTDROID_RUNNER_APPLICATION_FILE",
                                   description: "Either an IPA or APK containing the core application",
                                   optional: false,
+                                  type: String),
+          FastlaneCore::ConfigItem.new(key: :access_group,
+                                  env_name: "TESTDROID_RUNNER_ACCESS_GROUP",
+                                  description: "If present, will share uploaded files with the named access group",
+                                  optional: true,
                                   type: String)
         ]
       end
