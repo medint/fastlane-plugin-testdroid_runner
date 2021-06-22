@@ -13,9 +13,8 @@ module Fastlane
 
         # get all the devices to run on
         device_group = user.device_groups.list.detect { |group| group.display_name.casecmp(params[:device_group]) == 0 }
-        run_devices = device_group.devices.list.select { |device| device.os_type.casecmp(os_config[:name]) == 0 }
+        run_devices = device_group.devices.list_all.select { |device| device.os_type.casecmp(os_config[:name]) == 0 }
         puts("[testdroid] Running on devices #{run_devices.collect(&:display_name)}")
-
         # get IDs of the devices
         id_list = run_devices.collect(&:id)
 
@@ -35,7 +34,7 @@ module Fastlane
           i += params[:concurrency] * 2
           # start test run
           test_run = user.runs.create("{\"osType\": \"#{os_config[:name]}\", \"projectId\": #{project.id}, \"frameworkId\":#{framework_id},
-              \"deviceIds\": #{list}, \"scheduler\": \"#{params[:scheduler] || 'SERIAL'}\", \"files\": [{\"id\": #{file_app.id}, \"action\": \"INSTALL\" },
+              \"deviceIds\": #{list}, \"scheduler\": \"#{params[:scheduler] || 'SERIAL'}\", \"timeout\": \"#{params[:timeout]}\", \"files\": [{\"id\": #{file_app.id}, \"action\": \"INSTALL\" },
               {\"id\": #{file_test.id}, \"action\": \"RUN_TEST\" }]}")
           puts("[testdroid] Started test run, access it using this link: https://cloud.bitbar.com/#testing/projects/#{project.id}/#{test_run.id}")
 
@@ -53,8 +52,16 @@ module Fastlane
 
           next unless params[:report_dir]
           puts("[testdroid] Downloading files...")
-          test_run.device_sessions.list({ limit: 0 })
-                  .each { |ds| ds.download_all_files(params[:report_dir]) }
+            test_run.device_sessions.list_all().each { |tr|
+              begin
+                downloaded_file = "#{params[:report_dir]}/#{tr.id()}.zip"
+                user.instance_variable_get(:@client)
+                  .download("/cloud/api/v2/me/device-sessions/#{tr.id()}/output-file-set/files.zip", downloaded_file)
+                puts("[testdroid] Downloaded file for #{tr.device["displayName"]} (device session #{tr.id()}) as #{downloaded_file}")
+              rescue
+                puts("[testdroid] No files available for #{tr.device["displayName"]} (device session #{tr.id()})")
+              end
+            }
           puts("[testdroid] All files downloaded")
         end
       ensure

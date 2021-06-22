@@ -13,3 +13,4 @@ test-results
 .env
 reports
 .vscode
+.DS_Store
