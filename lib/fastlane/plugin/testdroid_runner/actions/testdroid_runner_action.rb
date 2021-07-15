@@ -72,7 +72,7 @@ module Fastlane
                                   default_value: 2),
           FastlaneCore::ConfigItem.new(key: :timeout,
                                   env_name: "TESTDROID_RUNNER_TIMEOUT",
-                                  description: "Timeout for running the tests in seconds. Testdroid has a default of 30m, we set 60m as default.",
+                                  description: "Timeout for running the tests in seconds. Testdroid has a default of 30m, we set 60m as default",
                                   optional: true,
                                   type: Integer,
                                   default_value: 3600),
