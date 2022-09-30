@@ -33,7 +33,7 @@ module Fastlane
           list = id_list[i, i + params[:concurrency] * 2]
           i += params[:concurrency] * 2
           # start test run
-          test_run = user.runs.create("{\"osType\": \"#{os_config[:name]}\", \"projectId\": #{project.id}, \"frameworkId\":#{framework_id},
+          test_run = user.runs.create("{\"osType\": \"#{os_config[:name]}\", \"projectId\": #{project.id}, \"frameworkId\":#{framework_id}, \"testRunName\":\"#{params[:test_run_name]}\",
               \"deviceIds\": #{list}, \"scheduler\": \"#{params[:scheduler] || 'SERIAL'}\", \"timeout\": \"#{params[:timeout]}\", \"files\": [{\"id\": #{file_app.id}, \"action\": \"INSTALL\" },
               {\"id\": #{file_test.id}, \"action\": \"RUN_TEST\" }]}")
           puts("[testdroid] Started test run, access it using this link: https://cloud.bitbar.com/#testing/projects/#{project.id}/#{test_run.id}")
@@ -47,7 +47,9 @@ module Fastlane
 
           print("\n")
 
-          puts("[testdroid] Test run finished with success ratio: #{test_run.success_ratio * 100}% [executed:#{test_run.execution_ratio * 100}%]")
+          success_ratio = test_run.success_ratio * 100
+          execution_ratio = test_run.execution_ratio * 100
+          puts("[testdroid] Test run finished with success ratio: #{success_ratio}% [executed:#{execution_ratio}%]")
           # download all files from all device sessions
 
           next unless params[:report_dir]
@@ -63,6 +65,8 @@ module Fastlane
               end
             }
           puts("[testdroid] All files downloaded")
+          
+          raise "UI Test Faild" unless success_ratio.eql? execution_ratio
         end
       ensure
         puts("[testdroid] Cleaning up...")

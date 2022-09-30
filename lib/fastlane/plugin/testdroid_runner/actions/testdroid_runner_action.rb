@@ -86,6 +86,10 @@ module Fastlane
                                   env_name: "TESTDROID_RUNNER_ACCESS_GROUP",
                                   description: "If present, will share uploaded files with the named access group",
                                   optional: true,
+                                  type: String),
+          FastlaneCore::ConfigItem.new(key: :test_run_name,
+                                  description: "If present, will change the test run name",
+                                  optional: false,
                                   type: String)
         ]
       end
